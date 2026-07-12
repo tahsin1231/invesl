@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "Fira Code", "Share Tech Mono", monospace;
+  --font-sans: "Fira Code", monospace;
+  --font-display: "Share Tech Mono", monospace;
+}
+
+/* Retro Terminal Scanline and Glow */
+.retro-terminal {
+  background-color: #020617;
+  color: #10b981; /* Default retro green */
+  font-family: "Fira Code", monospace;
+  text-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+}
+
+.retro-amber {
+  color: #f59e0b;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+}
+
+.retro-green {
+  color: #10b981;
+  text-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+}
+
+.retro-cyan {
+  color: #06b6d4;
+  text-shadow: 0 0 4px rgba(6, 182, 212, 0.4);
+}
+
+.terminal-border {
+  border: 1px solid #1e293b;
+}
+
+.terminal-border-active {
+  border: 1px solid #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+
+.terminal-border-amber {
+  border: 1px solid #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.15);
+}
+
+/* CRT Scanlines and flicker */
+.crt::after {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 9999;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+}
+
+.crt-flicker {
+  animation: textShadow 1.6s infinite;
+}
+
+@keyframes textShadow {
+  0% {
+    text-shadow: 0.43899241933015154px 0 1px rgba(0,30,255,0.5), -0.43899241933015154px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  5% {
+    text-shadow: 2.799683935552382px 0 1px rgba(0,30,255,0.5), -2.799683935552382px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  10% {
+    text-shadow: 0.02956275845481224px 0 1px rgba(0,30,255,0.5), -0.02956275845481224px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  15% {
+    text-shadow: 0.40218538552878136px 0 1px rgba(0,30,255,0.5), -0.40218538552878136px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  20% {
+    text-shadow: 3.4794037899852017px 0 1px rgba(0,30,255,0.5), -3.4794037899852017px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  25% {
+    text-shadow: 1.6125630400075677px 0 1px rgba(0,30,255,0.5), -1.6125630400075677px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  30% {
+    text-shadow: 0.7015555541604085px 0 1px rgba(0,30,255,0.5), -0.7015555541604085px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  35% {
+    text-shadow: 3.896914047650351px 0 1px rgba(0,30,255,0.5), -3.896914047650351px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  40% {
+    text-shadow: 3.870905614848819px 0 1px rgba(0,30,255,0.5), -3.870905614848819px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  45% {
+    text-shadow: 2.23105696144893px 0 1px rgba(0,30,255,0.5), -2.23105696144893px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  50% {
+    text-shadow: 0.08084290417899137px 0 1px rgba(0,30,255,0.5), -0.08084290417899137px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  55% {
+    text-shadow: 2.3758461067427115px 0 1px rgba(0,30,255,0.5), -2.3758461067427115px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  60% {
+    text-shadow: 2.2021931348452415px 0 1px rgba(0,30,255,0.5), -2.2021931348452415px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  65% {
+    text-shadow: 2.8638780614874975px 0 1px rgba(0,30,255,0.5), -2.8638780614874975px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  70% {
+    text-shadow: 0.48874025155497314px 0 1px rgba(0,30,255,0.5), -0.48874025155497314px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  75% {
+    text-shadow: 1.8948491305757957px 0 1px rgba(0,30,255,0.5), -1.8948491305757957px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  80% {
+    text-shadow: 0.08330373080388584px 0 1px rgba(0,30,255,0.5), -0.08330373080388584px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  85% {
+    text-shadow: 0.09769827255241552px 0 1px rgba(0,30,255,0.5), -0.09769827255241552px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  90% {
+    text-shadow: 3.4433343819657px 0 1px rgba(0,30,255,0.5), -3.4433343819657px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  95% {
+    text-shadow: 2.184183829248287px 0 1px rgba(0,30,255,0.5), -2.184183829248287px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+  100% {
+    text-shadow: 2.6208764473832513px 0 1px rgba(0,30,255,0.5), -2.6208764473832513px 0 1px rgba(255,0,80,0.3), 0 0 3px;
+  }
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #10b98120;
+  border: 1px solid #10b98160;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #10b98140;
+}
+
+/* Disable text selection across the entire app except inside input and textarea elements */
+*:not(input):not(textarea) {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE10+/Edge */
+  user-select: none;         /* Standard */
+}

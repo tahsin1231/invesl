@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with balance, profit, and referral info",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user UID from Firebase Auth" },
+        "email": { "type": "string", "description": "Verified user email address" },
+        "isVerified": { "type": "boolean", "description": "Whether the user email is verified" },
+        "balance": { "type": "number", "description": "Main wallet balance in USDT" },
+        "activeInvestments": { "type": "number", "description": "Total active capital deployed" },
+        "totalProfit": { "type": "number", "description": "Total earned dividends and commissions" },
+        "referralCode": { "type": "string", "description": "Unique invite code for this user" },
+        "referredBy": { "type": "string", "description": "Referral code of the referrer who invited this user" },
+        "referralsCount": { "type": "number", "description": "Number of direct invited accounts" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+      },
+      "required": ["id", "email", "isVerified", "balance", "activeInvestments", "totalProfit", "referralCode", "referralsCount", "createdAt"]
+    },
+    "ActivePlan": {
+      "title": "ActivePlan",
+      "description": "An active algorithmic trading subscription tier contract",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique active contract ID" },
+        "planId": { "type": "string", "description": "Level ID (1 to 7)" },
+        "name": { "type": "string", "description": "Name of the level" },
+        "price": { "type": "number", "description": "USDT deposit cost" },
+        "dailyProfit": { "type": "number", "description": "Simulated target daily yield in USDT" },
+        "startDate": { "type": "string", "description": "ISO timestamp of contract start" },
+        "endDate": { "type": "string", "description": "ISO timestamp of contract expiration" },
+        "lastCollectedAt": { "type": "string", "description": "ISO timestamp of last yield collection" },
+        "totalEarned": { "type": "number", "description": "Total accumulated yield from this contract" },
+        "status": { "type": "string", "enum": ["active", "completed"] }
+      },
+      "required": ["id", "planId", "name", "price", "dailyProfit", "startDate", "endDate", "lastCollectedAt", "totalEarned", "status"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Transaction log for deposits, withdrawals, and referrals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ledger ID" },
+        "type": { "type": "string", "enum": ["deposit", "withdraw", "invest", "profit", "referral"] },
+        "amount": { "type": "number", "description": "USDT value of transaction" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "date": { "type": "string", "description": "Readable timestamp of transaction" },
+        "txHash": { "type": "string", "description": "Transaction hash or address details" }
+      },
+      "required": ["id", "type", "amount", "status", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user document containing wallet details and profile variables"
+    },
+    "/users/{userId}/activePlans/{planId}": {
+      "schema": "ActivePlan",
+      "description": "Algorithmic subscription plans active on the user's profile"
+    },
+    "/users/{userId}/transactions/{txId}": {
+      "schema": "Transaction",
+      "description": "Audit trails for funding, deposits, and payouts on the user's account"
+    }
+  }
+}
