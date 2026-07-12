@@ -15,6 +15,7 @@ export interface User {
   phone?: string;
   isBanned?: boolean;
   banReason?: string;
+  password?: string;
 }
 
 export interface Plan {

@@ -66,6 +66,8 @@ interface AppContextType {
   monthlyWithdrawalLimit: number;
   dailyWithdrawalLimit: number;
   updateWithdrawalLimits: (minW: number, maxW: number, monthlyW: number, dailyW: number) => Promise<void>;
+  referralCommissionRate: number;
+  updateReferralCommissionRate: (rate: number) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -86,6 +88,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [maxWithdrawal, setMaxWithdrawal] = useState<number>(1000.00);
   const [monthlyWithdrawalLimit, setMonthlyWithdrawalLimit] = useState<number>(5000.00);
   const [dailyWithdrawalLimit, setDailyWithdrawalLimit] = useState<number>(1000.00);
+  const [referralCommissionRate, setReferralCommissionRate] = useState<number>(20);
 
   // Mining simulation states
   const [miningActive, setMiningActive] = useState<boolean>(false);
@@ -167,6 +170,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMaxWithdrawal(typeof data.maxWithdrawal === 'number' ? data.maxWithdrawal : 1000.00);
         setMonthlyWithdrawalLimit(typeof data.monthlyWithdrawalLimit === 'number' ? data.monthlyWithdrawalLimit : 5000.00);
         setDailyWithdrawalLimit(typeof data.dailyWithdrawalLimit === 'number' ? data.dailyWithdrawalLimit : 1000.00);
+        setReferralCommissionRate(typeof data.referralCommissionRate === 'number' ? data.referralCommissionRate : 20);
       } else {
         // Create settings doc if it does not exist
         try {
@@ -177,7 +181,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             minWithdrawal: 5.00,
             maxWithdrawal: 1000.00,
             monthlyWithdrawalLimit: 5000.00,
-            dailyWithdrawalLimit: 1000.00
+            dailyWithdrawalLimit: 1000.00,
+            referralCommissionRate: 20
           });
         } catch (e) {
           console.error('Failed to create global settings doc', e);
@@ -188,6 +193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMaxWithdrawal(1000.00);
         setMonthlyWithdrawalLimit(5000.00);
         setDailyWithdrawalLimit(1000.00);
+        setReferralCommissionRate(20);
       }
     }, (err) => {
       console.error('Error listening to global config:', err);
@@ -223,6 +229,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      const customUid = localStorage.getItem('doddoge_custom_user_id');
+      
+      if (customUid) {
+        try {
+          const userDocRef = doc(db, 'users', customUid);
+          const userSnap = await getDoc(userDocRef);
+          if (userSnap.exists()) {
+            const userData = userSnap.data() as User;
+            if (userData.isBanned) {
+              setUser(null);
+              setActivePlans([]);
+              setTransactions([]);
+              setHasInitializedMining(false);
+              localStorage.removeItem('doddoge_custom_user_id');
+              return;
+            }
+            setUser(userData);
+
+            const plansSnap = await getDocs(collection(db, 'users', customUid, 'activePlans'));
+            const plansList = plansSnap.docs.map(d => d.data() as ActivePlan);
+            setActivePlans(plansList);
+
+            const txsSnap = await getDocs(collection(db, 'users', customUid, 'transactions'));
+            const txsList = txsSnap.docs.map(d => d.data() as Transaction);
+            setTransactions(txsList);
+            return;
+          }
+        } catch (e) {
+          console.error("Custom user loading error:", e);
+        }
+      }
+
       if (fbUser) {
         try {
           const userDocRef = doc(db, 'users', fbUser.uid);
@@ -441,7 +479,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         username: cleanUsername,
-        phone: phone ? phone.trim() : ''
+        phone: phone ? phone.trim() : '',
+        password: password
       };
 
       // Set user profile in Firestore
@@ -474,6 +513,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!password) {
         return { success: false, error: 'Password is required' };
       }
+      const emailLower = email.trim().toLowerCase();
+      
+      // Look up user in Firestore first to check if they have a custom password set by Admin
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', emailLower));
+      const querySnap = await getDocs(q);
+      
+      if (!querySnap.empty) {
+        const userDoc = querySnap.docs[0];
+        const userData = userDoc.data() as User;
+        
+        if (userData.password && userData.password === password) {
+          if (userData.isBanned) {
+            return { success: false, error: 'Your account has been banned by the Administrator.' };
+          }
+          
+          try {
+            await signOut(auth);
+          } catch (e) {
+            // ignore
+          }
+          
+          setUser(userData);
+          localStorage.setItem('doddoge_custom_user_id', userData.id);
+          
+          const plansSnap = await getDocs(collection(db, 'users', userData.id, 'activePlans'));
+          const plansList = plansSnap.docs.map(d => d.data() as ActivePlan);
+          setActivePlans(plansList);
+
+          const txsSnap = await getDocs(collection(db, 'users', userData.id, 'transactions'));
+          const txsList = txsSnap.docs.map(d => d.data() as Transaction);
+          setTransactions(txsList);
+          
+          return { success: true };
+        }
+      }
+
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const fbUser = userCred.user;
 
@@ -491,7 +567,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await updateDoc(userDocRef, { isVerified: true });
           userData.isVerified = true;
         }
+        
+        // Save the registered password in Firestore if it was missing
+        if (!userData.password && password) {
+          await updateDoc(userDocRef, { password: password });
+          userData.password = password;
+        }
+        
         setUser(userData);
+        localStorage.removeItem('doddoge_custom_user_id');
 
         const plansSnap = await getDocs(collection(db, 'users', fbUser.uid, 'activePlans'));
         const plansList = plansSnap.docs.map(d => d.data() as ActivePlan);
@@ -736,6 +820,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateReferralCommissionRate = async (rate: number) => {
+    try {
+      const settingsRef = doc(db, 'settings', 'global');
+      await setDoc(settingsRef, { referralCommissionRate: rate }, { merge: true });
+      setReferralCommissionRate(rate);
+    } catch (err) {
+      console.error('Error updating referral commission rate:', err);
+      throw err;
+    }
+  };
+
   const withdraw = async (amount: number, address: string) => {
     if (!user) return { success: false, error: 'User session not found' };
     if (user.balance < amount) {
@@ -889,7 +984,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!querySnap.empty) {
           const referrerDoc = querySnap.docs[0];
           const referrerData = referrerDoc.data();
-          const commission = Number((plan.price * 0.20).toFixed(2));
+          const commRate = typeof referralCommissionRate === 'number' ? referralCommissionRate : 20;
+          const commission = Number((plan.price * (commRate / 100)).toFixed(2));
 
           const newRefBalance = Number((referrerData.balance + commission).toFixed(2));
           const newRefProfit = Number((referrerData.totalProfit + commission).toFixed(2));
@@ -1036,7 +1132,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       maxWithdrawal,
       monthlyWithdrawalLimit,
       dailyWithdrawalLimit,
-      updateWithdrawalLimits
+      updateWithdrawalLimits,
+      referralCommissionRate,
+      updateReferralCommissionRate
     }}>
       {children}
     </AppContext.Provider>

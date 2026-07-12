@@ -37,7 +37,9 @@ import {
   ShieldCheck,
   Award,
   Terminal,
-  Cpu
+  Cpu,
+  UserCheck,
+  CheckSquare
 } from 'lucide-react';
 
 interface PromoCode {
@@ -120,6 +122,20 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   // Session audit trail
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Selected user edit fields
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserBalance, setEditUserBalance] = useState('');
+  const [editUserFirstName, setEditUserFirstName] = useState('');
+  const [editUserLastName, setEditUserLastName] = useState('');
+  const [editUserUsername, setEditUserUsername] = useState('');
+  const [editUserPhone, setEditUserPhone] = useState('');
+  const [editUserReferredBy, setEditUserReferredBy] = useState('');
+  const [isSavingUserFields, setIsSavingUserFields] = useState(false);
+
+  // Global referral commission rate state
+  const [referralCommissionRateInput, setReferralCommissionRateInput] = useState('20');
 
   // Monitor Auth Status on load
   useEffect(() => {
@@ -248,6 +264,7 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setMaxWithdrawalInput(String(data.maxWithdrawal ?? '1000.00'));
         setMonthlyWithdrawalLimitInput(String(data.monthlyWithdrawalLimit ?? '5000.00'));
         setDailyWithdrawalLimitInput(String(data.dailyWithdrawalLimit ?? '1000.00'));
+        setReferralCommissionRateInput(String(data.referralCommissionRate ?? '20'));
       }
     } catch (err) {
       console.error('Error fetching global settings:', err);
@@ -464,9 +481,62 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       // Sort newest first
       txsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setSelectedUserTxs(txsList);
+
+      // Populate edit states
+      setEditUserEmail(user.email || '');
+      setEditUserPassword(user.password || '');
+      setEditUserBalance(String(user.balance ?? '0'));
+      setEditUserFirstName(user.firstName || '');
+      setEditUserLastName(user.lastName || '');
+      setEditUserUsername(user.username || '');
+      setEditUserPhone(user.phone || '');
+      setEditUserReferredBy(user.referredBy || '');
     } catch (err) {
       console.error('Error loading subcollections:', err);
     }
+  };
+
+  // Save selected user fields override
+  const handleSaveUserFields = async () => {
+    if (!selectedUser) return;
+    setIsSavingUserFields(true);
+    try {
+      const userRef = doc(db, 'users', selectedUser.id);
+      const updatedFields = {
+        email: editUserEmail.trim(),
+        password: editUserPassword.trim(),
+        balance: parseFloat(editUserBalance) || 0,
+        firstName: editUserFirstName.trim(),
+        lastName: editUserLastName.trim(),
+        username: editUserUsername.trim(),
+        phone: editUserPhone.trim(),
+        referredBy: editUserReferredBy.trim() || null
+      };
+
+      await updateDoc(userRef, updatedFields);
+      
+      const updatedUser = { ...selectedUser, ...updatedFields };
+      setSelectedUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updatedUser : u));
+
+      addAuditLog(`Updated Profile Information`, selectedUser.email);
+      alert('User details saved and synchronized successfully!');
+    } catch (err: any) {
+      alert('Failed to save user fields: ' + err.message);
+    } finally {
+      setIsSavingUserFields(false);
+    }
+  };
+
+  // Impersonate / Proxy Login as User
+  const handleImpersonateUser = () => {
+    if (!selectedUser) return;
+    const confirmImpersonation = window.confirm(`Are you sure you want to login as this user?\n\nUser: ${selectedUser.email}\n\nYou will enter their dashboard exactly as they see it. You can exit anytime via the exit banner. Click OK to proceed.`);
+    if (!confirmImpersonation) return;
+
+    localStorage.setItem('doddoge_custom_user_id', selectedUser.id);
+    addAuditLog(`Impersonated Session Started`, selectedUser.email);
+    window.location.reload();
   };
 
   // Ban/Unban user
@@ -722,7 +792,8 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         minWithdrawal: parseFloat(minWithdrawalInput) || 5.00,
         maxWithdrawal: parseFloat(maxWithdrawalInput) || 1000.00,
         monthlyWithdrawalLimit: parseFloat(monthlyWithdrawalLimitInput) || 5000.00,
-        dailyWithdrawalLimit: parseFloat(dailyWithdrawalLimitInput) || 1000.00
+        dailyWithdrawalLimit: parseFloat(dailyWithdrawalLimitInput) || 1000.00,
+        referralCommissionRate: parseFloat(referralCommissionRateInput) || 20
       }, { merge: true });
 
       addAuditLog('Updated Global Settings Matrix', 'Mainframe Config');
@@ -1070,14 +1141,20 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       <div className="flex items-start justify-between">
                         <div>
                           <h2 className="text-sm font-bold text-white uppercase">
-                            {selectedUser.firstName} {selectedUser.lastName}
+                            {selectedUser.firstName || 'No Name'} {selectedUser.lastName || ''}
                           </h2>
                           <p className="text-[10px] text-slate-500 mt-0.5">UID: {selectedUser.id}</p>
-                          <p className="text-[10px] text-slate-500">Email: {selectedUser.email}</p>
-                          {selectedUser.phone && <p className="text-[10px] text-slate-500">Phone: {selectedUser.phone}</p>}
+                          <p className="text-[10px] text-slate-500 font-mono">Email: {selectedUser.email}</p>
+                          <p className="text-[10px] text-emerald-400 font-mono">Password: {selectedUser.password || 'Using Google OAuth / Unset'}</p>
                         </div>
-                        <div className="text-right">
-                          <span className="text-[9px] text-emerald-500/40 uppercase block">Affiliate Code</span>
+                        <div className="text-right flex flex-col items-end gap-2">
+                          <button
+                            onClick={handleImpersonateUser}
+                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 border border-amber-300"
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>Impersonate User</span>
+                          </button>
                           <span className="text-xs font-mono font-bold text-emerald-400 bg-slate-900 border border-emerald-500/15 px-2 py-0.5 rounded">
                             {selectedUser.referralCode}
                           </span>
@@ -1104,6 +1181,168 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                           </span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Profile Information overrides form */}
+                    <div className="bg-slate-950/80 p-4 border border-emerald-500/10 rounded-xl space-y-3">
+                      <h3 className="text-[10px] font-bold text-white uppercase tracking-wider border-b border-emerald-500/10 pb-1.5 flex justify-between items-center">
+                        <span>EDIT LIVE USER DETAILS</span>
+                        <span className="text-[9px] text-emerald-500/40 font-mono">ID: {selectedUser.id.slice(0, 8)}</span>
+                      </h3>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Email Port</label>
+                          <input
+                            type="email"
+                            value={editUserEmail}
+                            onChange={(e) => setEditUserEmail(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Access Password</label>
+                          <input
+                            type="text"
+                            value={editUserPassword}
+                            onChange={(e) => setEditUserPassword(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">USDT Balance</label>
+                          <input
+                            type="number"
+                            value={editUserBalance}
+                            onChange={(e) => setEditUserBalance(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Username (@)</label>
+                          <input
+                            type="text"
+                            value={editUserUsername}
+                            onChange={(e) => setEditUserUsername(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">First Name</label>
+                          <input
+                            type="text"
+                            value={editUserFirstName}
+                            onChange={(e) => setEditUserFirstName(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Last Name</label>
+                          <input
+                            type="text"
+                            value={editUserLastName}
+                            onChange={(e) => setEditUserLastName(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Phone Node</label>
+                          <input
+                            type="text"
+                            value={editUserPhone}
+                            onChange={(e) => setEditUserPhone(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] text-slate-500 uppercase mb-1">Referred By (Code)</label>
+                          <input
+                            type="text"
+                            value={editUserReferredBy}
+                            onChange={(e) => setEditUserReferredBy(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-3 text-xs text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSaveUserFields}
+                        disabled={isSavingUserFields}
+                        className="w-full bg-slate-900 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 font-bold py-2.5 px-3 rounded-lg text-[10px] uppercase border border-emerald-500/20 hover:border-emerald-400 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-mono"
+                      >
+                        {isSavingUserFields ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>SAVING PROFILE OVERRIDES...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            <span>COMMIT PROFILE OVERRIDES</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Active Plans / koyta plan kinlo - view and change */}
+                    <div className="bg-slate-950 p-4 border border-emerald-500/10 rounded-xl space-y-3">
+                      <h3 className="text-[10px] font-bold text-white uppercase tracking-wider border-b border-emerald-500/10 pb-1.5 flex justify-between items-center">
+                        <span>ACTIVE PLANS & MINERS SUBSCRIPTION</span>
+                        <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 rounded font-mono font-bold">
+                          {selectedUserPlans.length} PLANNED
+                        </span>
+                      </h3>
+
+                      {selectedUserPlans.length === 0 ? (
+                        <p className="text-[10px] text-slate-600 italic py-2 text-center">No active plans subscribed by user.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-40 overflow-y-auto scrollbar pr-1">
+                          {selectedUserPlans.map((p) => {
+                            const handleTerminateActivePlan = async () => {
+                              if (!window.confirm(`Are you sure you want to terminate this active plan [${p.name}]?`)) return;
+                              try {
+                                await deleteDoc(doc(db, 'users', selectedUser.id, 'activePlans', p.id));
+                                setSelectedUserPlans(prev => prev.filter(item => item.id !== p.id));
+                                addAuditLog(`Terminated Active Plan ${p.name}`, selectedUser.email);
+                                alert('User active mining plan terminated successfully.');
+                              } catch (err: any) {
+                                alert('Failed to terminate plan: ' + err.message);
+                              }
+                            };
+
+                            return (
+                              <div key={p.id} className="bg-slate-900/60 p-2.5 border border-slate-800 rounded-lg flex items-center justify-between text-[11px]">
+                                <div>
+                                  <p className="font-bold text-white uppercase">{p.name}</p>
+                                  <p className="text-[9px] text-slate-500">Price: ${p.price} USDT | Profit: ${p.totalEarned.toFixed(4)}</p>
+                                  <p className="text-[8px] text-slate-600 font-mono">Start: {new Date(p.startDate).toLocaleDateString()}</p>
+                                </div>
+                                <div className="text-right flex flex-col items-end gap-1">
+                                  <span className="text-[8px] px-1 bg-emerald-500/10 text-emerald-400 uppercase font-mono font-bold rounded">
+                                    {p.status}
+                                  </span>
+                                  <button
+                                    onClick={handleTerminateActivePlan}
+                                    className="bg-red-950/40 hover:bg-red-900 border border-red-500/20 hover:border-red-400 text-red-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase cursor-pointer transition-all"
+                                  >
+                                    Terminate
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Operational Actions Grid */}
@@ -1227,32 +1466,45 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         </button>
                       </div>
 
-                      {/* Display user transactions log */}
+                      {/* Display user transactions log - withdraw kon adress e dilo included */}
                       <div>
                         <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
                           RECORDS LEDGER LOGS
                         </h4>
-                        <div className="max-h-36 overflow-y-auto border border-emerald-500/5 rounded-lg bg-slate-950 p-2 text-[10px] space-y-1.5 scrollbar">
+                        <div className="max-h-56 overflow-y-auto border border-emerald-500/5 rounded-lg bg-slate-950 p-2 text-[10px] space-y-1.5 scrollbar">
                           {selectedUserTxs.length === 0 ? (
                             <div className="text-slate-800 text-center py-4">No logged transactions found.</div>
                           ) : (
                             selectedUserTxs.map((tx) => (
                               <div key={tx.id} className="flex justify-between items-center border-b border-slate-900 pb-1.5">
-                                <div>
-                                  <span className={`uppercase font-bold px-1 rounded text-[8px] mr-1.5 ${
-                                    tx.type === 'deposit' ? 'bg-emerald-500/10 text-emerald-400' :
-                                    tx.type === 'withdraw' ? 'bg-red-500/10 text-red-400' : 'bg-slate-900 text-slate-400'
-                                  }`}>
-                                    {tx.type}
-                                  </span>
-                                  <span className="text-slate-400">{tx.id}</span>
-                                  <p className="text-[8px] text-slate-600 mt-0.5">{tx.date}</p>
+                                <div className="max-w-[70%]">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`uppercase font-bold px-1 rounded text-[8px] ${
+                                      tx.type === 'deposit' ? 'bg-emerald-500/10 text-emerald-400' :
+                                      tx.type === 'withdraw' ? 'bg-red-500/10 text-red-400' : 'bg-slate-900 text-slate-400'
+                                    }`}>
+                                      {tx.type}
+                                    </span>
+                                    <span className="text-slate-400 font-mono text-[9px]">{tx.id}</span>
+                                  </div>
+                                  <p className="text-[8px] text-slate-600 mt-0.5 font-mono">{tx.date}</p>
+                                  {tx.address && (
+                                    <p className="text-[9px] text-amber-400 font-semibold mt-1 font-mono break-all bg-amber-500/5 px-2 py-1 rounded border border-emerald-500/10 shadow-[0_0_8px_rgba(245,158,11,0.05)]">
+                                      DEST CRYPTO ADDRESS: {tx.address}
+                                    </p>
+                                  )}
+                                  {tx.txHash && tx.type === 'withdraw' && !tx.address && (
+                                    <p className="text-[9px] text-amber-400 font-semibold mt-1 font-mono break-all bg-amber-500/5 px-2 py-1 rounded border border-emerald-500/10 shadow-[0_0_8px_rgba(245,158,11,0.05)]">
+                                      DEST CRYPTO ADDRESS: {tx.txHash}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="text-right">
                                   <span className="font-bold text-white font-mono">${tx.amount.toFixed(2)}</span>
                                   <div className="flex items-center gap-1 justify-end mt-0.5">
                                     <span className={`text-[8px] px-1 rounded uppercase font-bold ${
-                                      tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-500'
+                                      tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 
+                                      tx.status === 'rejected' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-500'
                                     }`}>
                                       {tx.status}
                                     </span>
@@ -1692,6 +1944,28 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     </div>
                     <p className="text-[8px] text-slate-500 uppercase leading-normal">
                       Configure individual boundaries for users. Standard transactions will be validated against these before submission.
+                    </p>
+                  </div>
+
+                  {/* Referral Commission Rates */}
+                  <div className="bg-slate-950 p-4 border border-emerald-500/10 rounded-xl space-y-3">
+                    <div className="flex items-center gap-1.5 text-white border-b border-emerald-500/10 pb-2">
+                      <Award className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Affiliate Commission System Config</span>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] text-slate-500 uppercase mb-1">Global Referral Commission Rate (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g. 20"
+                        value={referralCommissionRateInput}
+                        onChange={(e) => setReferralCommissionRateInput(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none font-mono"
+                      />
+                    </div>
+                    <p className="text-[8px] text-slate-500 uppercase leading-normal">
+                      Adjusts the affiliate reward rate paid to referrers when their sub-nodes buy active investment packages. Standard default value is 20%.
                     </p>
                   </div>
                 </div>

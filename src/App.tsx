@@ -262,6 +262,13 @@ function MainApp() {
     setCmdInput('');
   };
 
+  const isImpersonating = typeof window !== 'undefined' && !!localStorage.getItem('doddoge_custom_user_id');
+
+  const handleExitImpersonation = () => {
+    localStorage.removeItem('doddoge_custom_user_id');
+    window.location.reload();
+  };
+
   if (adminOpen) {
     return <AdminPanel onClose={() => setAdminOpen(false)} />;
   }
@@ -315,6 +322,21 @@ function MainApp() {
   return (
     <div className="bg-slate-950 text-emerald-400 min-h-screen flex flex-col font-mono selection:bg-emerald-500 selection:text-slate-950 crt relative overflow-hidden">
       
+      {isImpersonating && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-2.5 text-xs font-bold font-mono uppercase tracking-wider flex justify-between items-center z-50 shadow-md relative">
+          <div className="flex items-center gap-2">
+            <span className="animate-ping inline-flex h-2.5 w-2.5 rounded-full bg-slate-950 opacity-75 mr-1" />
+            <span>ADMINISTRATOR PORT IMPERSONATION LOGGED IN AS: <strong className="underline text-slate-900">{user?.email}</strong></span>
+          </div>
+          <button 
+            onClick={handleExitImpersonation}
+            className="bg-slate-950 text-amber-500 px-3.5 py-1.5 rounded border border-transparent hover:border-amber-400 font-bold transition-all uppercase cursor-pointer"
+          >
+            Exit Impersonation
+          </button>
+        </div>
+      )}
+
       {/* Laser line horizontal scanning overlay */}
       <div className="absolute inset-x-0 top-0 h-[2px] bg-emerald-500/10 shadow-[0_0_10px_#10b981] animate-[pulse_2s_infinite] pointer-events-none z-50" />
 
