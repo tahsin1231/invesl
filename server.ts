@@ -118,4 +118,8 @@ async function setupApp() {
   });
 }
 
-setupApp();
+if (!process.env.VERCEL) {
+  setupApp();
+}
+
+export default app;
