@@ -63,4 +63,5 @@ export interface Transaction {
   fee?: number;
   netAmount?: number;
   address?: string;
+  timestamp?: number;
 }

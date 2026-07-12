@@ -4,7 +4,18 @@ import { translations } from '../utils/translations';
 import { ArrowDownLeft, ArrowUpRight, DollarSign, Clock, HelpCircle, Copy, Check, QrCode } from 'lucide-react';
 
 export const WalletView: React.FC = () => {
-  const { user, transactions, deposit, verifyDeposit, withdraw, language } = useApp();
+  const { 
+    user, 
+    transactions, 
+    deposit, 
+    verifyDeposit, 
+    withdraw, 
+    language,
+    minWithdrawal,
+    maxWithdrawal,
+    dailyWithdrawalLimit,
+    monthlyWithdrawalLimit
+  } = useApp();
   const t = translations[language];
 
   const [activeSubTab, setActiveSubTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
@@ -317,11 +328,19 @@ export const WalletView: React.FC = () => {
           <form onSubmit={handleWithdrawSubmit} className="space-y-4 max-w-lg">
             <h3 className="font-bold text-white text-xs uppercase mb-2">Withdraw Funds</h3>
             
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded p-3 flex items-start space-x-2 text-[10px] text-amber-500 uppercase leading-relaxed mb-3">
-              <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                NOTICE: Accrued profit and available balances can be withdrawn instantly once approved by the administrator. Withdrawals are restricted to the Binance Smart Chain (USDT BEP20) network.
-              </span>
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded p-3 flex flex-col space-y-1.5 text-[10px] text-amber-500 uppercase leading-relaxed mb-3">
+              <div className="flex items-start space-x-2">
+                <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  NOTICE: Accrued profit and available balances can be withdrawn instantly once approved by the administrator. Withdrawals are restricted to the Binance Smart Chain (USDT BEP20) network.
+                </span>
+              </div>
+              <div className="border-t border-amber-500/10 pt-1.5 grid grid-cols-2 gap-2 text-[9px] text-amber-400 font-mono">
+                <div>MIN WITHDRAWAL: ${minWithdrawal?.toFixed(2)} USDT</div>
+                <div>MAX WITHDRAWAL: ${maxWithdrawal?.toFixed(2)} USDT</div>
+                <div>DAILY LIMIT: ${dailyWithdrawalLimit?.toFixed(2)} USDT</div>
+                <div>MONTHLY LIMIT: ${monthlyWithdrawalLimit?.toFixed(2)} USDT</div>
+              </div>
             </div>
 
             {withdrawError && (

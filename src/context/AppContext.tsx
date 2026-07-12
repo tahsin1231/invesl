@@ -61,6 +61,11 @@ interface AppContextType {
   updateOxapayApiKey: (newKey: string) => Promise<void>;
   updateOxapayPayoutApiKey: (newKey: string) => Promise<void>;
   verifyDeposit: (trackId: string) => Promise<{ success: boolean; message: string; amount?: number }>;
+  minWithdrawal: number;
+  maxWithdrawal: number;
+  monthlyWithdrawalLimit: number;
+  dailyWithdrawalLimit: number;
+  updateWithdrawalLimits: (minW: number, maxW: number, monthlyW: number, dailyW: number) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -77,6 +82,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [oxapayApiKey, setOxapayApiKey] = useState<string>('HLSOHL-M4XCBM-MXMW4B-0BD5YD');
   const [oxapayPayoutApiKey, setOxapayPayoutApiKey] = useState<string>('HLSOHL-M4XCBM-MXMW4B-0BD5YD');
+  const [minWithdrawal, setMinWithdrawal] = useState<number>(5.00);
+  const [maxWithdrawal, setMaxWithdrawal] = useState<number>(1000.00);
+  const [monthlyWithdrawalLimit, setMonthlyWithdrawalLimit] = useState<number>(5000.00);
+  const [dailyWithdrawalLimit, setDailyWithdrawalLimit] = useState<number>(1000.00);
 
   // Mining simulation states
   const [miningActive, setMiningActive] = useState<boolean>(false);
@@ -152,19 +161,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           setOxapayPayoutApiKey('HLSOHL-M4XCBM-MXMW4B-0BD5YD');
         }
+
+        // Sync limits
+        setMinWithdrawal(typeof data.minWithdrawal === 'number' ? data.minWithdrawal : 5.00);
+        setMaxWithdrawal(typeof data.maxWithdrawal === 'number' ? data.maxWithdrawal : 1000.00);
+        setMonthlyWithdrawalLimit(typeof data.monthlyWithdrawalLimit === 'number' ? data.monthlyWithdrawalLimit : 5000.00);
+        setDailyWithdrawalLimit(typeof data.dailyWithdrawalLimit === 'number' ? data.dailyWithdrawalLimit : 1000.00);
       } else {
         // Create settings doc if it does not exist
         try {
           await setDoc(settingsRef, { 
             oxapayApiKey: 'HLSOHL-M4XCBM-MXMW4B-0BD5YD', 
             oxapayPayoutApiKey: 'HLSOHL-M4XCBM-MXMW4B-0BD5YD', 
-            maintenanceMode: false 
+            maintenanceMode: false,
+            minWithdrawal: 5.00,
+            maxWithdrawal: 1000.00,
+            monthlyWithdrawalLimit: 5000.00,
+            dailyWithdrawalLimit: 1000.00
           });
         } catch (e) {
           console.error('Failed to create global settings doc', e);
         }
         setOxapayApiKey('HLSOHL-M4XCBM-MXMW4B-0BD5YD');
         setOxapayPayoutApiKey('HLSOHL-M4XCBM-MXMW4B-0BD5YD');
+        setMinWithdrawal(5.00);
+        setMaxWithdrawal(1000.00);
+        setMonthlyWithdrawalLimit(5000.00);
+        setDailyWithdrawalLimit(1000.00);
       }
     }, (err) => {
       console.error('Error listening to global config:', err);
@@ -694,6 +717,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateWithdrawalLimits = async (minW: number, maxW: number, monthlyW: number, dailyW: number) => {
+    try {
+      const settingsRef = doc(db, 'settings', 'global');
+      await setDoc(settingsRef, { 
+        minWithdrawal: minW, 
+        maxWithdrawal: maxW, 
+        monthlyWithdrawalLimit: monthlyW, 
+        dailyWithdrawalLimit: dailyW 
+      }, { merge: true });
+      setMinWithdrawal(minW);
+      setMaxWithdrawal(maxW);
+      setMonthlyWithdrawalLimit(monthlyW);
+      setDailyWithdrawalLimit(dailyW);
+    } catch (err) {
+      console.error('Error updating withdrawal limits:', err);
+      throw err;
+    }
+  };
+
   const withdraw = async (amount: number, address: string) => {
     if (!user) return { success: false, error: 'User session not found' };
     if (user.balance < amount) {
@@ -706,6 +748,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Withdrawal amount must be greater than the $0.25 USDT fee.' };
     }
 
+    // Validate limits
+    const getTxTime = (tx: Transaction): number => {
+      if (tx.timestamp) return tx.timestamp;
+      try {
+        const d = new Date(tx.date);
+        if (!isNaN(d.getTime())) return d.getTime();
+      } catch (e) {
+        // ignore
+      }
+      return 0;
+    };
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    const withdraws = transactions.filter(t => t.type === 'withdraw' && t.status !== 'rejected');
+
+    const dailyTotal = withdraws
+      .filter(t => getTxTime(t) >= startOfToday)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const monthlyTotal = withdraws
+      .filter(t => getTxTime(t) >= startOfThisMonth)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    if (amount < minWithdrawal) {
+      return { success: false, error: `Minimum withdrawal quantity allowed is $${minWithdrawal.toFixed(2)} USDT` };
+    }
+
+    if (amount > maxWithdrawal) {
+      return { success: false, error: `Maximum withdrawal quantity allowed is $${maxWithdrawal.toFixed(2)} USDT per transaction` };
+    }
+
+    if (dailyTotal + amount > dailyWithdrawalLimit) {
+      return { 
+        success: false, 
+        error: `This withdrawal would exceed your daily withdrawal limit of $${dailyWithdrawalLimit.toFixed(2)} USDT. You have already withdrawn $${dailyTotal.toFixed(2)} USDT today. Remaining: $${Math.max(0, dailyWithdrawalLimit - dailyTotal).toFixed(2)} USDT.` 
+      };
+    }
+
+    if (monthlyTotal + amount > monthlyWithdrawalLimit) {
+      return { 
+        success: false, 
+        error: `This withdrawal would exceed your monthly withdrawal limit of $${monthlyWithdrawalLimit.toFixed(2)} USDT. You have already withdrawn $${monthlyTotal.toFixed(2)} USDT this month. Remaining: $${Math.max(0, monthlyWithdrawalLimit - monthlyTotal).toFixed(2)} USDT.` 
+      };
+    }
+
     const newTx: Transaction = {
       id: 'TX-' + Math.floor(100000 + Math.random() * 900000),
       type: 'withdraw',
@@ -715,7 +805,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       txHash: address,
       address: address, // Set both so legacy and new structures read it
       fee,
-      netAmount
+      netAmount,
+      timestamp: Date.now()
     };
 
     try {
@@ -940,7 +1031,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       oxapayPayoutApiKey,
       updateOxapayApiKey,
       updateOxapayPayoutApiKey,
-      verifyDeposit
+      verifyDeposit,
+      minWithdrawal,
+      maxWithdrawal,
+      monthlyWithdrawalLimit,
+      dailyWithdrawalLimit,
+      updateWithdrawalLimits
     }}>
       {children}
     </AppContext.Provider>

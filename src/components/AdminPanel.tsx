@@ -108,6 +108,10 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [platformPayoutsOffset, setPlatformPayoutsOffset] = useState('249200');
   const [oxapayKeyInput, setOxapayKeyInput] = useState('');
   const [oxapayPayoutKeyInput, setOxapayPayoutKeyInput] = useState('');
+  const [minWithdrawalInput, setMinWithdrawalInput] = useState('5.00');
+  const [maxWithdrawalInput, setMaxWithdrawalInput] = useState('1000.00');
+  const [monthlyWithdrawalLimitInput, setMonthlyWithdrawalLimitInput] = useState('5000.00');
+  const [dailyWithdrawalLimitInput, setDailyWithdrawalLimitInput] = useState('1000.00');
   const [systemSaving, setSystemSaving] = useState(false);
 
   // Withdrawals queue state
@@ -240,6 +244,10 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setPlatformPayoutsOffset(String(data.payoutsOffset || '249200'));
         setOxapayKeyInput(data.oxapayApiKey || '');
         setOxapayPayoutKeyInput(data.oxapayPayoutApiKey || '');
+        setMinWithdrawalInput(String(data.minWithdrawal ?? '5.00'));
+        setMaxWithdrawalInput(String(data.maxWithdrawal ?? '1000.00'));
+        setMonthlyWithdrawalLimitInput(String(data.monthlyWithdrawalLimit ?? '5000.00'));
+        setDailyWithdrawalLimitInput(String(data.dailyWithdrawalLimit ?? '1000.00'));
       }
     } catch (err) {
       console.error('Error fetching global settings:', err);
@@ -710,7 +718,11 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         usersOffset: parseInt(platformUsersOffset) || 14800,
         payoutsOffset: parseInt(platformPayoutsOffset) || 249200,
         oxapayApiKey: oxapayKeyInput,
-        oxapayPayoutApiKey: oxapayPayoutKeyInput
+        oxapayPayoutApiKey: oxapayPayoutKeyInput,
+        minWithdrawal: parseFloat(minWithdrawalInput) || 5.00,
+        maxWithdrawal: parseFloat(maxWithdrawalInput) || 1000.00,
+        monthlyWithdrawalLimit: parseFloat(monthlyWithdrawalLimitInput) || 5000.00,
+        dailyWithdrawalLimit: parseFloat(dailyWithdrawalLimitInput) || 1000.00
       }, { merge: true });
 
       addAuditLog('Updated Global Settings Matrix', 'Mainframe Config');
@@ -1619,6 +1631,67 @@ export const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     />
                     <p className="text-[8px] text-slate-500 uppercase leading-normal">
                       This key is used on the server side to authorize and execute real payouts when you click approve.
+                    </p>
+                  </div>
+
+                  {/* Withdrawal Boundaries Controls */}
+                  <div className="bg-slate-950 p-4 border border-emerald-500/10 rounded-xl space-y-3">
+                    <div className="flex items-center gap-1.5 text-white border-b border-emerald-500/10 pb-2">
+                      <Sliders className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Withdrawal Boundaries & Limits</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[8px] text-slate-500 uppercase mb-1">Minimum Withdrawal</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 5.00"
+                          value={minWithdrawalInput}
+                          onChange={(e) => setMinWithdrawalInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] text-slate-500 uppercase mb-1">Maximum Withdrawal</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 1000.00"
+                          value={maxWithdrawalInput}
+                          onChange={(e) => setMaxWithdrawalInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[8px] text-slate-500 uppercase mb-1">Daily Limit (Per User)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 1000.00"
+                          value={dailyWithdrawalLimitInput}
+                          onChange={(e) => setDailyWithdrawalLimitInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] text-slate-500 uppercase mb-1">Monthly Limit (Per User)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 5000.00"
+                          value={monthlyWithdrawalLimitInput}
+                          onChange={(e) => setMonthlyWithdrawalLimitInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[8px] text-slate-500 uppercase leading-normal">
+                      Configure individual boundaries for users. Standard transactions will be validated against these before submission.
                     </p>
                   </div>
                 </div>

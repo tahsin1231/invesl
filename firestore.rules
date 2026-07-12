@@ -6,6 +6,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Collection Group rule for transactions (needed for Admin Panel collectionGroup queries)
+    match /{path=**}/transactions/{txId} {
+      allow read: if isAdmin();
+    }
+
     // Helpers
     function isSignedIn() {
       return request.auth != null;
